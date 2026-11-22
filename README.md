@@ -16,7 +16,7 @@ Waversa 官方网页 App 的 macOS 原生实现：菜单栏常驻，
 - FM 频段与预设（`preset_list` 推送）切换，已在带 FM 硬件的机型上实测通过
 - 设备菜单动态渲染（Output Mode / Digital Filter / Screen Brightness 等），改动即时下发并接受设备回推校正
 - UDP 9400 局域网发现 + WebSocket 控制，断线按 2/4/8/16/30 秒退避自动重连
-- 界面文案跟随系统语言（简体中文环境显示中文，其余回退英文），深浅色自适应
+- 界面跟随系统语言：简体中文 / English / 日本語 / 한국어 / Deutsch，其余语言回退英文；深浅色自适应
 
 ## 下载
 

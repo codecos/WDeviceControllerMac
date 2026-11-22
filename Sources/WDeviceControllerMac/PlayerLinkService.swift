@@ -335,7 +335,7 @@ private enum PlayerLinkError: LocalizedError {
         case .badURL: return L("播放器地址无效", "Invalid player URL")
         case .badResponse: return L("播放器响应异常", "Unexpected player response")
         case .badPayload: return L("播放器数据格式不兼容", "Unsupported player data format")
-        case .http(let code): return L("播放器返回 HTTP \(code)", "Player returned HTTP \(code)")
+        case .http(let code): return LF("播放器返回 HTTP %ld", "Player returned HTTP %ld", code)
         case .notReady(let reason): return reason
         }
     }

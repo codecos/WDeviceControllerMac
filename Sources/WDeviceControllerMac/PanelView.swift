@@ -175,8 +175,9 @@ private struct QuickControlView: View {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(Capsule().fill(Color.accentColor.opacity(0.16)))
-                            .help(L("曲目信息来自 \(viewModel.playerLinkName ?? "No Glass Player")",
-                          "Track info from \(viewModel.playerLinkName ?? "No Glass Player")"))
+                            .help(LF("曲目信息来自 %@",
+                                     "Track info from %@",
+                                     viewModel.playerLinkName ?? "No Glass Player"))
                     }
                 }
 
