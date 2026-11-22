@@ -1,12 +1,12 @@
 # WDeviceController for macOS
 
 同一作者的 Windows 版 [`WDeviceController`](https://github.com/codecos/WDeviceController) 的 macOS 原生移植：
-菜单栏常驻，用 Waversa 手机 App 相同的 UDP 发现 + WebSocket 协议遥控 WNDR / WRemote 音频设备。
+菜单栏常驻，用与 Waversa 官方网页 App 相同的 UDP 发现 + WebSocket 协议遥控 WNDR / WRemote 音频设备。
 
 ![面板](docs/panel.png)
 
 > Windows 版与这个 macOS 版都是个人项目，不是 Waversa Systems 官方软件，也不代表官方立场。
-> 设备指令是从官方手机 App 与网络流量里反推出来的，目前只在 WSlimPro 上实测过，
+> 设备指令是从官方网页 App 与网络流量里反推出来的，目前只在 WSlimPro 上实测过，
 > 其他机型请自行验证。
 
 ## 功能
@@ -56,7 +56,7 @@ CONFIG=debug ./scripts/build-app.sh # 组装 debug 版 .app
 - 控制：`ws://<ip>:9000`，子协议 `wremote-protocol, json`
 - `wndr-port`（如 9200）是音频输出端口，**不是**控制端口；Windows 版的 DnsScanner 同样固定连 9000，
   本移植版也按 9000 连接，旧配置连不上时自动回退
-- 设备同一时间只允许一个控制端（先到先得）。手机 App 抢占、设备重启、Wi-Fi 抖动导致的断开，
+- 设备同一时间只允许一个控制端（先到先得）。网页 App 或手机 App 抢占、设备重启、Wi-Fi 抖动导致的断开，
   会自动退避重连
 - 修改设置走 `settings` 报文（`id` / `handler` / `type` / `eeprom_addr` / `value`），
   以设备回推的新 `menulist` 为准；发送失败会回滚界面
