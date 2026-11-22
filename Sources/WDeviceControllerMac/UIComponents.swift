@@ -42,15 +42,11 @@ struct CardStyle: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(colorScheme == .dark
-                          ? Color.white.opacity(0.065)
-                          : Color.white.opacity(0.92))
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.065) : Color.clear)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(colorScheme == .dark
-                                  ? Color.white.opacity(0.10)
-                                  : Color.black.opacity(0.055),
+                    .strokeBorder(colorScheme == .dark ? Color.white.opacity(0.10) : Color.clear,
                                   lineWidth: 1)
             )
     }
