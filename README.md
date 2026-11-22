@@ -1,11 +1,11 @@
 # WDeviceController for macOS
 
-同一作者的 Windows 版 [`WDeviceController`](https://github.com/codecos/WDeviceController) 的 macOS 原生移植：
-菜单栏常驻，用与 Waversa 官方网页 App 相同的 UDP 发现 + WebSocket 协议遥控 WNDR / WRemote 音频设备。
+Waversa 官方网页 App 的 macOS 原生实现：菜单栏常驻，
+用与网页 App 相同的 UDP 发现 + WebSocket 协议遥控 WNDR / WRemote 音频设备。
 
 ![面板](docs/panel.png)
 
-> Windows 版与这个 macOS 版都是个人项目，不是 Waversa Systems 官方软件，也不代表官方立场。
+> 个人作品，不是 Waversa Systems 官方软件，也不代表官方立场。
 > 设备指令是从官方网页 App 与网络流量里反推出来的，目前只在 WSlimPro 上实测过，
 > 其他机型请自行验证。
 
@@ -51,10 +51,10 @@ CONFIG=debug ./scripts/build-app.sh # 组装 debug 版 .app
 
 ## 连接与协议
 
-- 发现：UDP 9400 广播 `search`（与 Windows 版一致），取响应里的 `ipv4_addr`
+- 发现：UDP 9400 广播 `search`，取响应里的 `ipv4_addr`
 - 控制：`ws://<ip>:9000`，子协议 `wremote-protocol, json`
-- `wndr-port`（如 9200）是音频输出端口，**不是**控制端口；Windows 版的 DnsScanner 同样固定连 9000，
-  本移植版也按 9000 连接，旧配置连不上时自动回退
+- `wndr-port`（如 9200）是音频输出端口，**不是**控制端口；控制连接固定走 9000，
+  旧配置连不上时自动回退
 - 设备同一时间只允许一个控制端（先到先得）。网页 App 或手机 App 抢占、设备重启、Wi-Fi 抖动导致的断开，
   会自动退避重连
 - 修改设置走 `settings` 报文（`id` / `handler` / `type` / `eeprom_addr` / `value`），
@@ -62,7 +62,7 @@ CONFIG=debug ./scripts/build-app.sh # 组装 debug 版 .app
 
 ## 已知限制
 
-- **Roon Ready 兼容性不保证**：相关逻辑是很早以前照着 Windows 版写的，之后没有设备可测，
+- **Roon Ready 兼容性不保证**：相关逻辑是很早以前写的，之后没有设备复测，
   行为可能和设备固件版本对不上；能切音源、能显示曲目信息就属于“碰巧可用”，出问题不修。
 - **进度条不支持拖拽 seek**：Roon Ready 官方协议本身有 seek 方法，只是本实现没写，
   界面上的进度条只做展示，短期内也不打算实现。
@@ -112,9 +112,9 @@ WDeviceControllerMac/
     └── AlbumArtLoader.swift       # 封面加载与降采样
 ```
 
-## 与 Windows 版的实现差异
+## 实现要点
 
-- 设备发现除广播外会额外探测本机网卡所在网段，便于多网卡环境
+- 设备发现除 UDP 广播外会额外探测本机网卡所在网段，便于多网卡环境
 - 面板用 `NSPanel` 实现，不进入 Mission Control，也不出现在 Dock
 - 菜单栏图标使用 SF Symbol 模板图，自动适配深浅色与强调色
 
