@@ -121,3 +121,8 @@ WDeviceControllerMac/
 ## 许可证
 
 [CC0 1.0 Universal](LICENSE)（公有领域奉献）。随便用，无需署名。
+
+但不允许：
+
+- 上传到任何应用商店（Mac App Store、第三方商店等）
+- 商用，包括但不限于付费分发、随硬件或服务捆绑销售、闭源商业产品内集成
