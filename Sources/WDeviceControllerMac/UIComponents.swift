@@ -168,7 +168,10 @@ struct GlassHoverBackground: View {
 struct HoverIconButton: View {
     let systemName: String
     var size: CGFloat = 13
+    var frame: CGFloat = 28
+    var tint: Color = .primary
     var help: String = ""
+    var isEnabled: Bool = true
     let action: () -> Void
 
     @State private var isHovering = false
@@ -177,76 +180,17 @@ struct HoverIconButton: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: size, weight: .semibold))
-                .frame(width: 28, height: 28)
-                .background { GlassHoverBackground(cornerRadius: 14, visible: isHovering) }
+                .frame(width: frame, height: frame)
+                .background {
+                    GlassHoverBackground(cornerRadius: frame / 2, visible: isHovering && isEnabled)
+                }
                 .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.primary)
-        .onHover { isHovering = $0 }
-        .help(help)
-    }
-}
-
-/// 顶部“连接 / 断开”胶囊按钮，静止时只有强调色文字，悬停才浮出带轻染的液态玻璃底。
-struct GlassPillButton: View {
-    let systemName: String
-    let title: String
-    var tint: Color = .accentColor
-    var isEnabled: Bool = true
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    private var highlighted: Bool { isHovering && isEnabled }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: systemName)
-                    .font(.system(size: 10, weight: .semibold))
-                Text(title)
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .padding(.horizontal, 11)
-            .padding(.vertical, 6)
-            .background {
-                GlassHoverBackground(cornerRadius: 13, visible: highlighted)
-            }
-            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .foregroundStyle(isEnabled ? tint : Color.secondary)
         .onHover { isHovering = $0 }
+        .help(help)
         .disabled(!isEnabled)
-    }
-}
-
-/// 底部的“设置”入口，悬停时才浮出液态玻璃底。
-struct SettingsButton: View {
-    let action: () -> Void
-
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 11, weight: .medium))
-                Text("设置")
-                    .font(.system(size: 12, weight: .medium))
-            }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background {
-                GlassHoverBackground(cornerRadius: 8, visible: isHovering)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .help("打开设置")
     }
 }
 

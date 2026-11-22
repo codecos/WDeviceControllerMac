@@ -111,9 +111,11 @@ private struct QuickControlView: View {
                 }
             }
 
-            GlassPillButton(
+            HoverIconButton(
                 systemName: viewModel.isConnected ? "bolt.slash.fill" : "bolt.fill",
-                title: viewModel.isConnected ? "断开" : "连接",
+                size: 13,
+                tint: .accentColor,
+                help: viewModel.isConnected ? "断开" : "连接",
                 isEnabled: viewModel.isConnected || (viewModel.selectedDevice != nil && !viewModel.isConnecting)
             ) {
                 if viewModel.isConnected {
@@ -313,7 +315,9 @@ private struct QuickControlView: View {
 
                 Spacer(minLength: 4)
 
-                SettingsButton { viewModel.openMenu() }
+                HoverIconButton(systemName: "gearshape", size: 12, tint: .secondary, help: "打开设置") {
+                    viewModel.openMenu()
+                }
             }
         }
         .padding(12)
