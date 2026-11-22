@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import ServiceManagement
 import SwiftUI
 
 final class FlyoutPanel: NSPanel {
@@ -14,7 +15,7 @@ final class StatusItemController: NSObject {
     private let panel: FlyoutPanel
     private let hostingView: NSHostingView<PanelView>
     private let contextMenu = NSMenu()
-    private let playerStatusItem = NSMenuItem(title: "播放器：未连接", action: nil, keyEquivalent: "")
+    private let launchAtLoginItem = NSMenuItem(title: "开机启动", action: nil, keyEquivalent: "")
 
     private var cancellables = Set<AnyCancellable>()
     private var localClickMonitor: Any?
@@ -90,32 +91,54 @@ final class StatusItemController: NSObject {
     private func configureMenu() {
         contextMenu.autoenablesItems = false
 
-        let openItem = NSMenuItem(title: "打开控制面板", action: #selector(menuOpenPanel), keyEquivalent: "")
+        let openItem = NSMenuItem(title: "打开面板", action: #selector(menuOpenPanel), keyEquivalent: "")
         openItem.target = self
         contextMenu.addItem(openItem)
 
-        let scanItem = NSMenuItem(title: "扫描设备", action: #selector(menuScan), keyEquivalent: "")
-        scanItem.target = self
-        contextMenu.addItem(scanItem)
-
-        let connectItem = NSMenuItem(title: "连接到…", action: #selector(menuPromptConnect), keyEquivalent: "")
-        connectItem.target = self
-        contextMenu.addItem(connectItem)
+        launchAtLoginItem.target = self
+        launchAtLoginItem.action = #selector(menuToggleLaunchAtLogin)
+        launchAtLoginItem.state = Self.isLaunchAtLoginEnabled ? .on : .off
+        contextMenu.addItem(launchAtLoginItem)
 
         contextMenu.addItem(.separator())
 
-        playerStatusItem.isEnabled = false
-        contextMenu.addItem(playerStatusItem)
-
-        let rediscoverItem = NSMenuItem(title: "重新发现 No Glass Player", action: #selector(menuRediscoverPlayer), keyEquivalent: "")
-        rediscoverItem.target = self
-        contextMenu.addItem(rediscoverItem)
-
-        contextMenu.addItem(.separator())
-
-        let quitItem = NSMenuItem(title: "退出 WDeviceController", action: #selector(menuQuit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "退出", action: #selector(menuQuit), keyEquivalent: "q")
         quitItem.target = self
         contextMenu.addItem(quitItem)
+    }
+
+    // MARK: - 开机启动
+
+    private static var isLaunchAtLoginEnabled: Bool {
+        SMAppService.mainApp.status == .enabled
+    }
+
+    @objc private func menuToggleLaunchAtLogin() {
+        let enabled = launchAtLoginItem.state != .on
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            presentLaunchAtLoginFailure(error)
+        }
+        launchAtLoginItem.state = Self.isLaunchAtLoginEnabled ? .on : .off
+    }
+
+    private func presentLaunchAtLoginFailure(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = "无法修改开机启动设置"
+        alert.informativeText = """
+        \(error.localizedDescription)
+
+        请先把 WDeviceController 拖到「应用程序」文件夹再试一次；如果仍然失败，可在「系统设置 › 通用 › 登录项」里手动添加。
+        """
+        alert.addButton(withTitle: "好")
+        alert.window.level = .floating
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     private func bindViewModel() {
@@ -284,14 +307,6 @@ final class StatusItemController: NSObject {
 
     private func showContextMenu() {
         hide()
-        if viewModel.isPlayerLinked {
-            let name = viewModel.playerLinkName ?? "No Glass Player"
-            playerStatusItem.title = viewModel.isPlayerLinkPrimary
-                ? "播放器：\(name)（联动中）"
-                : "播放器：\(name)（已连接）"
-        } else {
-            playerStatusItem.title = "播放器：未发现"
-        }
         statusItem.menu = contextMenu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
@@ -299,33 +314,6 @@ final class StatusItemController: NSObject {
 
     @objc private func menuOpenPanel() {
         show()
-    }
-
-    @objc private func menuScan() {
-        viewModel.scan()
-    }
-
-    @objc private func menuRediscoverPlayer() {
-        viewModel.rediscoverPlayerLink()
-    }
-
-    @objc private func menuPromptConnect() {
-        let alert = NSAlert()
-        alert.messageText = "连接到设备"
-        alert.informativeText = "输入设备的 IP 地址，或 IP:端口（默认端口 9000）。"
-        alert.addButton(withTitle: "连接")
-        alert.addButton(withTitle: "取消")
-
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        field.placeholderString = "192.168.1.100:9000"
-        field.stringValue = viewModel.selectedDevice?.ip ?? ""
-        alert.accessoryView = field
-        alert.window.level = .floating
-
-        NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn {
-            viewModel.connectManually(field.stringValue)
-        }
     }
 
     @objc private func menuQuit() {
