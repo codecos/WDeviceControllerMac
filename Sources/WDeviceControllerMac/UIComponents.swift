@@ -20,16 +20,38 @@ struct VisualEffectView: NSViewRepresentable {
     }
 }
 
+/// 面板底色：浅色模式下在毛玻璃上加一层白色，避免整体发灰。
+struct PanelBackdrop: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        ZStack {
+            VisualEffectView(material: .popover, blendingMode: .behindWindow)
+
+            if colorScheme == .light {
+                Color.white.opacity(0.55)
+            }
+        }
+    }
+}
+
 struct CardStyle: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
     func body(content: Content) -> some View {
         content
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(0.055))
+                    .fill(colorScheme == .dark
+                          ? Color.white.opacity(0.065)
+                          : Color.white.opacity(0.92))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+                    .strokeBorder(colorScheme == .dark
+                                  ? Color.white.opacity(0.10)
+                                  : Color.black.opacity(0.055),
+                                  lineWidth: 1)
             )
     }
 }

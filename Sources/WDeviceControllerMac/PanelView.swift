@@ -14,7 +14,7 @@ struct PanelView: View {
             }
         }
         .frame(width: 520)
-        .background(VisualEffectView(material: .popover, blendingMode: .behindWindow))
+        .background(PanelBackdrop())
         .overlay(
             Rectangle()
                 .strokeBorder(Color.primary.opacity(0.10), lineWidth: 1)
