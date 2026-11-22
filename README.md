@@ -18,6 +18,16 @@ Waversa 官方网页 App 的 macOS 原生实现：菜单栏常驻，
 - UDP 9400 局域网发现 + WebSocket 控制，断线按 2/4/8/16/30 秒退避自动重连
 - 全中文界面，深浅色自适应
 
+## 下载
+
+从 [Releases](https://github.com/codecos/WDeviceControllerMac/releases) 取最新包（Apple Silicon / macOS 13+）：
+
+- `WDeviceController-1.0.0-arm64.dmg`：挂载后把 App 拖进「应用程序」
+- `WDeviceController-1.0.0-arm64.zip`：解压得到 App
+
+应用为 ad-hoc 签名（无开发者证书），首次打开会被 Gatekeeper 拦下：
+在「应用程序」里右键 →「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/WDeviceController.app`。
+
 ## 系统要求
 
 - macOS 13 (Ventura) 或更高
