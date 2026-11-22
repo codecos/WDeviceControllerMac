@@ -79,18 +79,15 @@ private struct QuickControlView: View {
 
     private var deviceRow: some View {
         HStack(spacing: 8) {
-            Picker("", selection: Binding<String?>(
-                get: { viewModel.selectedDeviceID },
-                set: { viewModel.selectDevice(id: $0) }
-            )) {
-                ForEach(viewModel.devices) { device in
-                    Text(device.displayName).tag(Optional(device.id))
-                }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
+            GlassPicker(
+                options: viewModel.devices.map { (label: $0.displayName, value: Optional($0.id)) },
+                selection: viewModel.selectedDeviceID,
+                placeholder: viewModel.isScanning ? "扫描中…" : "未发现设备",
+                isEnabled: !viewModel.devices.isEmpty && !viewModel.isScanning,
+                fillsWidth: true,
+                onSelect: { viewModel.selectDevice(id: $0) }
+            )
             .frame(maxWidth: .infinity, alignment: .leading)
-            .disabled(viewModel.devices.isEmpty || viewModel.isScanning)
 
             if viewModel.isScanning {
                 ProgressView()
@@ -318,34 +315,18 @@ private struct QuickControlView: View {
                 if viewModel.availableSources.isEmpty {
                     Text("--").font(.system(size: 12)).foregroundStyle(.secondary)
                 } else {
-                    Picker("", selection: Binding<String?>(
-                        get: { viewModel.selectedSource },
-                        set: { if let source = $0 { viewModel.setSource(source) } }
-                    )) {
-                        ForEach(viewModel.availableSources, id: \.self) { source in
-                            Text(source).tag(Optional(source))
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
+                    GlassPicker(
+                        options: viewModel.availableSources.map { (label: $0, value: Optional($0)) },
+                        selection: viewModel.selectedSource,
+                        fillsWidth: true,
+                        onSelect: { if let source = $0 { viewModel.setSource(source) } }
+                    )
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Spacer(minLength: 4)
 
-                Button {
-                    viewModel.openMenu()
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 11, weight: .medium))
-                        Text("设置")
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .foregroundStyle(.secondary)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                SettingsButton { viewModel.openMenu() }
             }
         }
         .padding(12)
@@ -510,16 +491,12 @@ private struct MenuSettingsView: View {
             Spacer(minLength: 8)
 
             if let options = item.items, !options.isEmpty {
-                Picker("", selection: Binding(
-                    get: { item.selectedValue },
-                    set: { viewModel.setMenuValue(itemID: item.id, value: $0) }
-                )) {
-                    ForEach(options) { option in
-                        Text(option.title).tag(option.value)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
+                GlassPicker(
+                    options: options.map { (label: $0.title, value: $0.value) },
+                    selection: item.selectedValue,
+                    fillsWidth: true,
+                    onSelect: { viewModel.setMenuValue(itemID: item.id, value: $0) }
+                )
                 .frame(width: 190)
             } else {
                 Text(String(item.selectedValue))

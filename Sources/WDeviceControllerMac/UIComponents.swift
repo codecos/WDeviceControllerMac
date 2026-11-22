@@ -58,6 +58,106 @@ extension View {
     }
 }
 
+/// 悬停才显形的下拉选择器：静止时只有文字 + 箭头，鼠标移上去才浮出一块玻璃底。
+struct GlassPicker<Value: Hashable>: View {
+    let options: [(label: String, value: Value)]
+    let selection: Value
+    var placeholder: String = "--"
+    var isEnabled: Bool = true
+    var fillsWidth: Bool = false
+    let onSelect: (Value) -> Void
+
+    @State private var isHovering = false
+
+    private var currentLabel: String {
+        options.first(where: { $0.value == selection })?.label ?? placeholder
+    }
+
+    private var highlighted: Bool { isHovering && isEnabled }
+
+    var body: some View {
+        Menu {
+            ForEach(options.indices, id: \.self) { index in
+                Button {
+                    onSelect(options[index].value)
+                } label: {
+                    if options[index].value == selection {
+                        Label(options[index].label, systemImage: "checkmark")
+                    } else {
+                        Text(options[index].label)
+                    }
+                }
+            }
+        } label: {
+            labelBody
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize(horizontal: !fillsWidth, vertical: false)
+        .disabled(!isEnabled)
+        .onHover { isHovering = $0 }
+    }
+
+    private var labelBody: some View {
+        HStack(spacing: 6) {
+            Text(currentLabel)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isEnabled ? Color.primary : Color.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer(minLength: 6)
+
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
+        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background { hoverBackground }
+    }
+
+    @ViewBuilder private var hoverBackground: some View {
+        GlassHoverBackground(cornerRadius: 8, visible: highlighted)
+    }
+}
+
+/// 悬停才出现的液态玻璃底：macOS 26 用系统 glassEffect，旧系统用材质 + 高光描边近似。
+/// 圆角半径取控件宽高的一半即为圆形，避免为圆形/圆角矩形各写一份。
+struct GlassHoverBackground: View {
+    var cornerRadius: CGFloat
+    var visible: Bool
+
+    private var shape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
+
+    var body: some View {
+        if #available(macOS 26.0, *) {
+            if visible {
+                Color.clear.glassEffect(.regular.interactive(), in: shape)
+            }
+        } else if visible {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    shape.strokeBorder(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.55), Color.white.opacity(0.06)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+                )
+                .shadow(color: Color.black.opacity(0.10), radius: 5, y: 2)
+        }
+    }
+}
+
 struct HoverIconButton: View {
     let systemName: String
     var size: CGFloat = 13
@@ -71,15 +171,41 @@ struct HoverIconButton: View {
             Image(systemName: systemName)
                 .font(.system(size: size, weight: .semibold))
                 .frame(width: 28, height: 28)
-                .background(
-                    Circle().fill(Color.primary.opacity(isHovering ? 0.10 : 0))
-                )
+                .background { GlassHoverBackground(cornerRadius: 14, visible: isHovering) }
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
         .onHover { isHovering = $0 }
         .help(help)
+    }
+}
+
+/// 底部的“设置”入口，悬停时才浮出液态玻璃底。
+struct SettingsButton: View {
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 11, weight: .medium))
+                Text("设置")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background {
+                GlassHoverBackground(cornerRadius: 8, visible: isHovering)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .help("打开设置")
     }
 }
 
@@ -160,7 +286,7 @@ struct TransportButton: View {
             Image(systemName: systemName)
                 .font(.system(size: size, weight: .medium))
                 .frame(width: 34, height: 34)
-                .background(Circle().fill(Color.primary.opacity(isHovering ? 0.08 : 0)))
+                .background { GlassHoverBackground(cornerRadius: 17, visible: isHovering) }
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
