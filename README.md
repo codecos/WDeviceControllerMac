@@ -1,12 +1,13 @@
 # WDeviceController for macOS
 
-Windows 版 [`WDeviceController`](https://github.com/codecos/WDeviceController) 的 macOS 原生移植：
-菜单栏常驻，用与官方 App 一致的 UDP 发现 + WebSocket 协议遥控 WNDR / WRemote 音频设备。
+同一作者的 Windows 版 [`WDeviceController`](https://github.com/codecos/WDeviceController) 的 macOS 原生移植：
+菜单栏常驻，用 Waversa 手机 App 相同的 UDP 发现 + WebSocket 协议遥控 WNDR / WRemote 音频设备。
 
 ![面板](docs/panel.png)
 
-> 个人移植项目，与 Waversa Systems 官方无关。所有设备指令都按 Windows 版反推，
-> 仅在 WSlimPro 上实测过，其他机型请自行验证。
+> Windows 版与这个 macOS 版都是个人项目，不是 Waversa Systems 官方软件，也不代表官方立场。
+> 设备指令是从官方手机 App 与网络流量里反推出来的，目前只在 WSlimPro 上实测过，
+> 其他机型请自行验证。
 
 ## 功能
 
