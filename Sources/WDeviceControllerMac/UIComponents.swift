@@ -130,6 +130,8 @@ struct GlassPicker<Value: Hashable>: View {
 struct GlassHoverBackground: View {
     var cornerRadius: CGFloat
     var visible: Bool
+    /// 需要强调时才传入浅色轻染，默认中性玻璃。
+    var tint: Color? = nil
 
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -138,11 +140,16 @@ struct GlassHoverBackground: View {
     var body: some View {
         if #available(macOS 26.0, *) {
             if visible {
-                Color.clear.glassEffect(.regular.interactive(), in: shape)
+                if let tint {
+                    Color.clear.glassEffect(.regular.tint(tint).interactive(), in: shape)
+                } else {
+                    Color.clear.glassEffect(.regular.interactive(), in: shape)
+                }
             }
         } else if visible {
             shape
                 .fill(.ultraThinMaterial)
+                .overlay(shape.fill(tint ?? .clear))
                 .overlay(
                     shape.strokeBorder(
                         LinearGradient(
@@ -178,6 +185,40 @@ struct HoverIconButton: View {
         .foregroundStyle(.primary)
         .onHover { isHovering = $0 }
         .help(help)
+    }
+}
+
+/// 顶部“连接 / 断开”胶囊按钮，静止时只有强调色文字，悬停才浮出带轻染的液态玻璃底。
+struct GlassPillButton: View {
+    let systemName: String
+    let title: String
+    var tint: Color = .accentColor
+    var isEnabled: Bool = true
+    let action: () -> Void
+
+    @State private var isHovering = false
+
+    private var highlighted: Bool { isHovering && isEnabled }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: systemName)
+                    .font(.system(size: 10, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .background {
+                GlassHoverBackground(cornerRadius: 13, visible: highlighted)
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isEnabled ? tint : Color.secondary)
+        .onHover { isHovering = $0 }
+        .disabled(!isEnabled)
     }
 }
 

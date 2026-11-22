@@ -113,28 +113,17 @@ private struct QuickControlView: View {
                 }
             }
 
-            Button {
+            GlassPillButton(
+                systemName: viewModel.isConnected ? "bolt.slash.fill" : "bolt.fill",
+                title: viewModel.isConnected ? "断开" : "连接",
+                isEnabled: viewModel.isConnected || (viewModel.selectedDevice != nil && !viewModel.isConnecting)
+            ) {
                 if viewModel.isConnected {
                     viewModel.disconnect()
                 } else {
                     viewModel.connectToSelectedDevice()
                 }
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: viewModel.isConnected ? "bolt.slash.fill" : "bolt.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                    Text(viewModel.isConnected ? "断开" : "连接")
-                        .font(.system(size: 12, weight: .medium))
-                }
-                .padding(.horizontal, 11)
-                .padding(.vertical, 6)
-                .background(
-                    Capsule().fill(Color.accentColor.opacity(0.16))
-                )
-                .foregroundStyle(Color.accentColor)
             }
-            .buttonStyle(.plain)
-            .disabled(!viewModel.isConnected && (viewModel.selectedDevice == nil || viewModel.isConnecting))
         }
     }
 
