@@ -52,8 +52,6 @@ private struct QuickControlView: View {
                 } else {
                     emptyState
                 }
-
-                footer
             }
             .padding(16)
         }
@@ -328,18 +326,6 @@ private struct QuickControlView: View {
         return "speaker.wave.2.fill"
     }
 
-    private var footer: some View {
-        HStack(spacing: 6) {
-            Text(viewModel.statusMessage)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 2)
-        .frame(height: 14)
-    }
 }
 
 // MARK: - FM 预设名称编辑
