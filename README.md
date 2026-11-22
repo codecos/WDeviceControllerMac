@@ -89,8 +89,9 @@ NGP_BASE_URL=http://192.168.1.10:5217 ./build/WDeviceController.app/Contents/Mac
 
 - **Roon Ready 兼容性不保证**：相关逻辑是很早以前照着 Windows 版写的，之后没有设备可测，
   行为可能和设备固件版本对不上；能切音源、能显示曲目信息就属于“碰巧可用”，出问题不修。
-- **拖拽进度条 seek 未实现**：设备与 No Glass Player 都有 seek 接口
-  （`POST /api/player/seek`），但这里只用于切歌时归零，界面上没有可拖动的进度条。
+- **进度条不支持拖拽 seek**：Roon Ready 官方协议本身有 seek 方法，只是本实现没写
+  （No Glass Player 的 `POST /api/player/seek` 也仅用于切歌归零），界面上的进度条只做展示，
+  短期内也不打算实现。
 - FM 部分未在带 FM 硬件的机型上实测。
 - 未实现开机自启、英文界面、多设备同时保存。
 
