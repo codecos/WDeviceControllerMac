@@ -15,7 +15,7 @@ final class StatusItemController: NSObject {
     private let panel: FlyoutPanel
     private let hostingView: NSHostingView<PanelView>
     private let contextMenu = NSMenu()
-    private let launchAtLoginItem = NSMenuItem(title: "开机启动", action: nil, keyEquivalent: "")
+    private let launchAtLoginItem = NSMenuItem(title: L("开机启动", "Launch at Login"), action: nil, keyEquivalent: "")
 
     private var cancellables = Set<AnyCancellable>()
     private var localClickMonitor: Any?
@@ -91,7 +91,7 @@ final class StatusItemController: NSObject {
     private func configureMenu() {
         contextMenu.autoenablesItems = false
 
-        let openItem = NSMenuItem(title: "打开面板", action: #selector(menuOpenPanel), keyEquivalent: "")
+        let openItem = NSMenuItem(title: L("打开面板", "Open Panel"), action: #selector(menuOpenPanel), keyEquivalent: "")
         openItem.target = self
         contextMenu.addItem(openItem)
 
@@ -102,7 +102,7 @@ final class StatusItemController: NSObject {
 
         contextMenu.addItem(.separator())
 
-        let quitItem = NSMenuItem(title: "退出", action: #selector(menuQuit), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: L("退出", "Quit"), action: #selector(menuQuit), keyEquivalent: "q")
         quitItem.target = self
         contextMenu.addItem(quitItem)
     }
@@ -129,13 +129,13 @@ final class StatusItemController: NSObject {
 
     private func presentLaunchAtLoginFailure(_ error: Error) {
         let alert = NSAlert()
-        alert.messageText = "无法修改开机启动设置"
+        alert.messageText = L("无法修改开机启动设置", "Couldn't change Launch at Login")
         alert.informativeText = """
         \(error.localizedDescription)
 
-        请先把 WDeviceController 拖到「应用程序」文件夹再试一次；如果仍然失败，可在「系统设置 › 通用 › 登录项」里手动添加。
+        \(L("请先把 WDeviceController 拖到「应用程序」文件夹再试一次；如果仍然失败，可在「系统设置 › 通用 › 登录项」里手动添加。", "Move WDeviceController into the Applications folder and try again. If it still fails, add it manually in System Settings › General › Login Items."))
         """
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: L("好", "OK"))
         alert.window.level = .floating
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
@@ -165,8 +165,8 @@ final class StatusItemController: NSObject {
         image.isTemplate = true
         statusItem.button?.image = image
         statusItem.button?.toolTip = viewModel.isConnected
-            ? "WDeviceController · 已连接"
-            : "WDeviceController · 未连接"
+            ? L("WDeviceController · 已连接", "WDeviceController · Connected")
+            : L("WDeviceController · 未连接", "WDeviceController · Disconnected")
     }
 
     // MARK: - 显示/隐藏

@@ -208,10 +208,11 @@ struct SectionLabel: View {
 struct StatusPill: View {
     let state: String
     let connected: Bool
+    var isStandby: Bool = false
 
     private var color: Color {
         if !connected { return .secondary }
-        return state.caseInsensitiveCompare("standby") == .orderedSame ? .orange : .green
+        return isStandby ? .orange : .green
     }
 
     var body: some View {

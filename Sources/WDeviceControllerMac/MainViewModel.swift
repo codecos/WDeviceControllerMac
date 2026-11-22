@@ -106,8 +106,8 @@ final class MainViewModel: ObservableObject {
     // MARK: - 计算属性
 
     var deviceState: String {
-        if !isConnected { return "Disconnected" }
-        return isDeviceStandby ? "Standby" : "Connected"
+        if !isConnected { return L("未连接", "Disconnected") }
+        return isDeviceStandby ? L("待机", "Standby") : L("已连接", "Connected")
     }
 
     var isFmVisible: Bool {

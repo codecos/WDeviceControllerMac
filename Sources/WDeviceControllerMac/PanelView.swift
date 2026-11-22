@@ -63,7 +63,7 @@ private struct QuickControlView: View {
                 Text(viewModel.selectedDevice?.hostname ?? "WDeviceController")
                     .font(.system(size: 20, weight: .semibold))
                     .lineLimit(1)
-                Text(viewModel.isConnected ? viewModel.bitrate : "未连接设备")
+                Text(viewModel.isConnected ? viewModel.bitrate : L("未连接设备", "Not Connected"))
                     .font(.system(size: 12, weight: .medium))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
@@ -71,7 +71,11 @@ private struct QuickControlView: View {
 
             Spacer(minLength: 8)
 
-            StatusPill(state: viewModel.deviceState, connected: viewModel.isConnected)
+            StatusPill(
+                state: viewModel.deviceState,
+                connected: viewModel.isConnected,
+                isStandby: viewModel.isDeviceStandby
+            )
         }
     }
 
@@ -80,7 +84,7 @@ private struct QuickControlView: View {
             GlassPicker(
                 options: viewModel.devices.map { (label: $0.displayName, value: Optional($0.id)) },
                 selection: viewModel.selectedDeviceID,
-                placeholder: viewModel.isScanning ? "扫描中…" : "未发现设备",
+                placeholder: viewModel.isScanning ? L("扫描中…", "Scanning…") : L("未发现设备", "No device found"),
                 isEnabled: !viewModel.devices.isEmpty && !viewModel.isScanning,
                 fillsWidth: true,
                 onSelect: { viewModel.selectDevice(id: $0) }
@@ -92,7 +96,7 @@ private struct QuickControlView: View {
                     .controlSize(.small)
                     .frame(width: 28, height: 28)
             } else {
-                HoverIconButton(systemName: "arrow.clockwise", size: 13, help: "扫描设备") {
+                HoverIconButton(systemName: "arrow.clockwise", size: 13, help: L("扫描设备", "Scan for devices")) {
                     viewModel.scan()
                 }
             }
@@ -101,7 +105,7 @@ private struct QuickControlView: View {
                 HoverIconButton(
                     systemName: viewModel.isDeviceStandby ? "power.circle.fill" : "moon.zzz",
                     size: 14,
-                    help: viewModel.isDeviceStandby ? "开机" : "待机"
+                    help: viewModel.isDeviceStandby ? L("开机", "Power On") : L("待机", "Standby")
                 ) {
                     if viewModel.isDeviceStandby {
                         viewModel.powerOn()
@@ -115,7 +119,7 @@ private struct QuickControlView: View {
                 systemName: viewModel.isConnected ? "bolt.slash.fill" : "bolt.fill",
                 size: 13,
                 tint: .accentColor,
-                help: viewModel.isConnected ? "断开" : "连接",
+                help: viewModel.isConnected ? L("断开", "Disconnect") : L("连接", "Connect"),
                 isEnabled: viewModel.isConnected || (viewModel.selectedDevice != nil && !viewModel.isConnecting)
             ) {
                 if viewModel.isConnected {
@@ -132,7 +136,8 @@ private struct QuickControlView: View {
             Image(systemName: "wifi.exclamationmark")
                 .font(.system(size: 16))
                 .foregroundStyle(.secondary)
-            Text("选择局域网内的设备并连接，即可控制播放、音量与设置。")
+            Text(L("选择局域网内的设备并连接，即可控制播放、音量与设置。",
+                    "Choose a device on your network to control playback, volume and settings."))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
@@ -147,12 +152,12 @@ private struct QuickControlView: View {
             AlbumArtView(image: viewModel.albumArt)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(viewModel.nowPlayingTitle.isEmpty ? "未知曲目" : viewModel.nowPlayingTitle)
+                Text(viewModel.nowPlayingTitle.isEmpty ? L("未知曲目", "Unknown Title") : viewModel.nowPlayingTitle)
                     .font(.system(size: 16, weight: .semibold))
                     .lineLimit(2)
                     .help(viewModel.nowPlayingTitle)
 
-                Text(viewModel.nowPlayingArtist.isEmpty ? "未知艺术家" : viewModel.nowPlayingArtist)
+                Text(viewModel.nowPlayingArtist.isEmpty ? L("未知艺术家", "Unknown Artist") : viewModel.nowPlayingArtist)
                     .font(.system(size: 12.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -170,7 +175,8 @@ private struct QuickControlView: View {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(Capsule().fill(Color.accentColor.opacity(0.16)))
-                            .help("曲目信息来自 \(viewModel.playerLinkName ?? "No Glass Player")")
+                            .help(L("曲目信息来自 \(viewModel.playerLinkName ?? "No Glass Player")",
+                          "Track info from \(viewModel.playerLinkName ?? "No Glass Player")"))
                     }
                 }
 
@@ -191,13 +197,13 @@ private struct QuickControlView: View {
 
                 HStack(spacing: 16) {
                     Spacer()
-                    TransportButton(systemName: "backward.fill", size: 15, help: "上一首") {
+                    TransportButton(systemName: "backward.fill", size: 15, help: L("上一首", "Previous")) {
                         viewModel.previousTrack()
                     }
-                    TransportButton(systemName: viewModel.playPauseSymbol, size: 21, help: "播放/暂停") {
+                    TransportButton(systemName: viewModel.playPauseSymbol, size: 21, help: L("播放/暂停", "Play/Pause")) {
                         viewModel.togglePlayPause()
                     }
-                    TransportButton(systemName: "forward.fill", size: 15, help: "下一首") {
+                    TransportButton(systemName: "forward.fill", size: 15, help: L("下一首", "Next")) {
                         viewModel.nextTrack()
                     }
                     Spacer()
@@ -219,7 +225,7 @@ private struct QuickControlView: View {
             }
 
             HStack(alignment: .center, spacing: 8) {
-                HoverIconButton(systemName: "chevron.left", size: 12, help: "上一个预设") {
+                HoverIconButton(systemName: "chevron.left", size: 12, help: L("上一个预设", "Previous preset")) {
                     viewModel.fmPresetDown()
                 }
 
@@ -233,7 +239,7 @@ private struct QuickControlView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                HoverIconButton(systemName: "chevron.right", size: 12, help: "下一个预设") {
+                HoverIconButton(systemName: "chevron.right", size: 12, help: L("下一个预设", "Next preset")) {
                     viewModel.fmPresetUp()
                 }
 
@@ -250,10 +256,10 @@ private struct QuickControlView: View {
                 }
 
                 VStack(spacing: 6) {
-                    HoverIconButton(systemName: "chevron.up", size: 11, help: "频率 +") {
+                    HoverIconButton(systemName: "chevron.up", size: 11, help: L("频率 +", "Frequency +")) {
                         viewModel.fmFrequencyUp()
                     }
-                    HoverIconButton(systemName: "chevron.down", size: 11, help: "频率 -") {
+                    HoverIconButton(systemName: "chevron.down", size: 11, help: L("频率 -", "Frequency −")) {
                         viewModel.fmFrequencyDown()
                     }
                 }
@@ -275,7 +281,7 @@ private struct QuickControlView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help(viewModel.isMuted ? "取消静音" : "静音")
+                .help(viewModel.isMuted ? L("取消静音", "Unmute") : L("静音", "Mute"))
 
                 Slider(
                     value: Binding(
@@ -315,7 +321,7 @@ private struct QuickControlView: View {
 
                 Spacer(minLength: 4)
 
-                HoverIconButton(systemName: "gearshape", size: 12, tint: .secondary, help: "打开设置") {
+                HoverIconButton(systemName: "gearshape", size: 12, tint: .secondary, help: L("打开设置", "Open settings")) {
                     viewModel.openMenu()
                 }
             }
@@ -344,22 +350,22 @@ private struct FmNameEditor: View {
     var body: some View {
         if isEditing {
             HStack(spacing: 4) {
-                TextField("预设名称", text: $draft)
+                TextField(L("预设名称", "Preset name"), text: $draft)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11))
                     .frame(width: 150)
                     .focused($isFocused)
                     .onSubmit(commit)
 
-                HoverIconButton(systemName: "checkmark", size: 10, help: "保存") {
+                HoverIconButton(systemName: "checkmark", size: 10, help: L("保存", "Save")) {
                     commit()
                 }
-                HoverIconButton(systemName: "xmark", size: 10, help: "取消") {
+                HoverIconButton(systemName: "xmark", size: 10, help: L("取消", "Cancel")) {
                     isEditing = false
                 }
             }
         } else {
-            HoverIconButton(systemName: "pencil", size: 11, help: "重命名预设") {
+            HoverIconButton(systemName: "pencil", size: 11, help: L("重命名预设", "Rename preset")) {
                 draft = viewModel.fmPresetTitle
                 isEditing = true
                 isFocused = true
@@ -381,24 +387,14 @@ private struct MenuSettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                HoverIconButton(systemName: "chevron.left", size: 13, help: "返回") {
+                HoverIconButton(systemName: "chevron.left", size: 13, help: L("返回", "Back")) {
                     viewModel.closeMenu()
                 }
 
-                Text("设置")
+                Text(L("设置", "Settings"))
                     .font(.system(size: 18, weight: .semibold))
 
                 Spacer()
-
-                Text("ESC")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.primary.opacity(0.08))
-                    )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -409,7 +405,7 @@ private struct MenuSettingsView: View {
                 VStack(spacing: 10) {
                     ProgressView()
                         .controlSize(.small)
-                    Text("正在读取设备设置…")
+                    Text(L("正在读取设备设置…", "Loading device settings…"))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }

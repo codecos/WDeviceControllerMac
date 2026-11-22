@@ -112,10 +112,10 @@ final class PlayerLinkService {
 
         let health: HealthResponse = try await get(base, "api/health")
         guard health.ok else {
-            throw PlayerLinkError.notReady(health.errorMessage ?? health.errorCode ?? "WebHost 未就绪")
+            throw PlayerLinkError.notReady(health.errorMessage ?? health.errorCode ?? L("WebHost 未就绪", "WebHost not ready"))
         }
         guard health.authRequired != true else {
-            throw PlayerLinkError.notReady("该节点需要鉴权")
+            throw PlayerLinkError.notReady(L("该节点需要鉴权", "This node requires authentication"))
         }
 
         baseURL = base
@@ -332,10 +332,10 @@ private enum PlayerLinkError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .badURL: return "播放器地址无效"
-        case .badResponse: return "播放器响应异常"
-        case .badPayload: return "播放器数据格式不兼容"
-        case .http(let code): return "播放器返回 HTTP \(code)"
+        case .badURL: return L("播放器地址无效", "Invalid player URL")
+        case .badResponse: return L("播放器响应异常", "Unexpected player response")
+        case .badPayload: return L("播放器数据格式不兼容", "Unsupported player data format")
+        case .http(let code): return L("播放器返回 HTTP \(code)", "Player returned HTTP \(code)")
         case .notReady(let reason): return reason
         }
     }
