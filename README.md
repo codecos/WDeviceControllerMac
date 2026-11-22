@@ -22,11 +22,15 @@ Waversa 官方网页 App 的 macOS 原生实现：菜单栏常驻，
 
 从 [Releases](https://github.com/codecos/WDeviceControllerMac/releases) 取最新包（Apple Silicon / macOS 13+）：
 
-- `WDeviceController-1.0.0-arm64.dmg`：挂载后把 App 拖进「应用程序」
-- `WDeviceController-1.0.0-arm64.zip`：解压得到 App
+- `WDeviceController-1.0.0-arm64.dmg`：挂载后把 App 拖到旁边的「应用程序」快捷方式
+- `WDeviceController-1.0.0-arm64.zip`：解压得到 App，自行拖进「应用程序」
 
 应用为 ad-hoc 签名（无开发者证书），首次打开会被 Gatekeeper 拦下：
 在「应用程序」里右键 →「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/WDeviceController.app`。
+
+**它是菜单栏应用，没有 Dock 图标，也不会弹主窗口**：双击后看起来「什么都没发生」，
+实际图标在屏幕右上角菜单栏（喇叭图标，已连接时为实心），点它才展开面板。
+菜单栏太挤被折叠时，可以用「打开控制面板」的右键菜单，或直接看菜单栏末尾的 `»`。
 
 ## 系统要求
 
@@ -53,7 +57,7 @@ CONFIG=debug ./scripts/build-app.sh # 组装 debug 版 .app
 
 ## 使用
 
-1. 启动后菜单栏出现控制器图标，点击展开面板
+1. 启动后**只在菜单栏**出现控制器图标（无 Dock 图标、无主窗口），点击展开面板
 2. 面板会自动连接上次使用的设备；换网络后会用 UDP 广播重新扫描并连接发现到的第一台
 3. 下拉框里的 `设备名 (IP)` 可手动输入地址；右侧按钮为刷新、重新扫描、断开
 4. 音源下拉框切换 USB / WNDR / Optical / Coaxial / FM / Roon Ready 等输入
