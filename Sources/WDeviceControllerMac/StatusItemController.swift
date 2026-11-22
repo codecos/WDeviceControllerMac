@@ -23,7 +23,6 @@ final class StatusItemController: NSObject {
     private var lastPanelSize = NSSize.zero
 
     private let panelWidth: CGFloat = 520
-    private let maxPanelHeight: CGFloat = 760
 
     init(viewModel: MainViewModel) {
         self.viewModel = viewModel
@@ -220,8 +219,9 @@ final class StatusItemController: NSObject {
         var size = hostingView.fittingSize
 
         let screen = panel.screen ?? NSScreen.main
+        // 不再固定高度的上限：菜单项全部展开显示，最多到屏幕可用高度。
         let available = (screen?.visibleFrame.height ?? 900) - 80
-        let heightLimit = min(maxPanelHeight, max(240, available))
+        let heightLimit = max(240, available)
 
         size.width = panelWidth
         size.height = min(max(size.height, 140), heightLimit)

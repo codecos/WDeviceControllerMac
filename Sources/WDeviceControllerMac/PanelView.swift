@@ -456,17 +456,20 @@ private struct MenuSettingsView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 60)
             } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 18) {
-                        ForEach(viewModel.menuGroups) { group in
-                            menuGroup(group)
-                        }
-                    }
-                    .padding(16)
-                }
-                .frame(maxHeight: 640)
+                // 不套 ScrollView：面板高度由内容撑开，菜单项有多少显示多少，
+                // 面板总高由 StatusItemController 限制在屏幕可用高度内。
+                menuList
             }
         }
+    }
+
+    private var menuList: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(viewModel.menuGroups) { group in
+                menuGroup(group)
+            }
+        }
+        .padding(16)
     }
 
     private func menuGroup(_ group: MenuGroup) -> some View {
