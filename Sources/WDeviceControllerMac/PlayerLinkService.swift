@@ -60,6 +60,8 @@ final class PlayerLinkService {
     private var currentState: PlaybackStateResponse?
     private var currentQueue: QueueResponse?
     private var queueIdentity: String?
+    /// 队列拉取失败后的冷却时间，避免按秒重试打爆对端。
+    private var queueRetryAfter = Date.distantPast
     private var lastEventAt = Date.distantPast
     private var pushCount = 0
 
@@ -247,9 +249,7 @@ final class PlayerLinkService {
 
         case "queueChanged":
             guard let push = try? JSONDecoder().decode(QueuePush.self, from: data) else { return }
-            currentQueue = push.queue
-            queueIdentity = Self.identity(currentState)
-            publish()
+            applyQueuePush(push.queue)
 
         case "queueDisconnected":
             currentQueue = nil
@@ -274,22 +274,55 @@ final class PlayerLinkService {
         }
     }
 
+    /// `queueChanged` 推送里只有摘要（`items` 是空数组），完整的曲目列表得回 REST 取。
+    /// 直接拿它覆盖会把正在显示的曲名/艺术家清掉，退化成文件名。
+    private func applyQueuePush(_ pushed: QueueResponse) {
+        let identity = Self.identity(currentState)
+        let incoming = pushed.items ?? []
+
+        if !incoming.isEmpty {
+            currentQueue = pushed
+            queueIdentity = identity
+        } else if let existing = currentQueue, queueIdentity == identity {
+            // 同一首曲子的摘要推送：只更新翻页能力，列表沿用已拉到的完整队列。
+            currentQueue = QueueResponse(
+                items: existing.items,
+                canNext: pushed.canNext,
+                canPrevious: pushed.canPrevious
+            )
+        } else {
+            // 没有可用列表（刚换曲/刚连上）：清掉旧曲目的信息，让下面去 REST 补全。
+            currentQueue = nil
+            queueIdentity = nil
+        }
+
+        publish()
+        refreshQueueIfNeeded()
+    }
+
     /// 换曲才拉队列：位置每秒都在变，队列只在会话/专辑/曲目变化时才有意义。
     private func refreshQueueIfNeeded() {
         guard let base = baseURL else { return }
         let identity = Self.identity(currentState)
         guard identity != queueIdentity else { return }
+        // 失败后 5 秒再试，避免每秒一条 state 推送都去打一次取不到的接口。
+        guard Date() >= queueRetryAfter else { return }
         Task { [weak self] in
             await self?.loadQueue(base, identity: identity)
         }
     }
 
     private func loadQueue(_ base: URL, identity: String) async {
-        guard let queue: QueueResponse = try? await get(base, "api/player/queue") else { return }
+        let queue: QueueResponse? = try? await get(base, "api/player/queue")
         // 拉取期间已经换曲：这份队列过期了，丢掉等下一次。
         guard Self.identity(currentState) == identity else { return }
-        currentQueue = queue
-        queueIdentity = identity
+
+        if let queue, !(queue.items?.isEmpty ?? true) {
+            currentQueue = queue
+            queueIdentity = identity
+        } else {
+            queueRetryAfter = Date().addingTimeInterval(5)
+        }
         publish()
     }
 
@@ -318,11 +351,12 @@ final class PlayerLinkService {
         let state: PlaybackStateResponse = try await get(base, "api/state")
         currentState = state
         lastEventAt = Date()
-        if let queue: QueueResponse = try? await get(base, "api/player/queue") {
+        if let queue: QueueResponse = try? await get(base, "api/player/queue"), !(queue.items?.isEmpty ?? true) {
             currentQueue = queue
             queueIdentity = Self.identity(state)
         }
         publish()
+        refreshQueueIfNeeded()
     }
 
     private func refreshFromRESTInBackground() {
@@ -348,7 +382,7 @@ final class PlayerLinkService {
         let hasTrack = !filePath.isEmpty || currentItem != nil
         guard hasTrack else { return nil }
 
-        let fallbackTitle = (filePath as NSString).lastPathComponent
+        let fallbackTitle = Self.fileName(filePath)
         let title = Self.nonEmpty(currentItem?.title) ?? Self.nonEmpty(fallbackTitle) ?? ""
         guard !title.isEmpty else { return nil }
 
@@ -461,6 +495,12 @@ final class PlayerLinkService {
     private static func identity(_ state: PlaybackStateResponse?) -> String {
         guard let state else { return "" }
         return "\(state.playbackSessionId ?? 0)|\(state.albumId ?? -1)|\(state.filePath ?? "")"
+    }
+
+    /// 兜底曲名：服务端给的是 Windows 路径，用 `/` 切会连盘符一起显示出来。
+    private static func fileName(_ path: String) -> String {
+        guard let separator = path.lastIndex(where: { $0 == "/" || $0 == "\\" }) else { return path }
+        return String(path[path.index(after: separator)...])
     }
 
     /// 把 WebHost 的 `http(s)://host:port[/]` 换成 `ws(s)://host:port/ws`。
