@@ -29,7 +29,7 @@ Waversa 官方网页 App 的 macOS 原生实现：菜单栏常驻，
 在「应用程序」里右键 →「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/WDeviceController.app`。
 
 **它是菜单栏应用，没有 Dock 图标，也不会弹主窗口**：双击后看起来「什么都没发生」，
-实际图标在屏幕右上角菜单栏（喇叭图标，已连接时为实心），点它才展开面板。
+实际图标在屏幕右上角菜单栏（滑杆图标，已连接时加粗），点它才展开面板。
 菜单栏太挤被折叠时，可以用右键菜单里的「打开面板」，或直接看菜单栏末尾的 `»`。
 
 ## 系统要求
@@ -109,7 +109,7 @@ WDeviceControllerMac/
 │   └── AppIcon.icns
 ├── scripts/
 │   ├── build-app.sh               # SwiftPM 编译 + 组装 .app + ad-hoc 签名
-│   └── make-icon.swift            # 由托盘图标生成 .icns
+│   └── make-icon.swift            # 统一图标画法（App 图标 .icns / Windows .ico）
 ├── docs/panel.png                 # 界面截图
 └── Sources/WDeviceControllerMac/
     ├── AppMain.swift              # NSApplication 入口、菜单栏控制器装配

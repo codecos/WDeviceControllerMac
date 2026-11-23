@@ -157,16 +157,41 @@ final class StatusItemController: NSObject {
     }
 
     private func updateStatusIcon() {
-        let symbol = viewModel.isConnected ? "hifispeaker.fill" : "hifispeaker"
-        guard let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "WDeviceController") else {
-            return
-        }
-        image.size = NSSize(width: 18, height: 16)
-        image.isTemplate = true
+        let connected = viewModel.isConnected
+        // 与 App 图标同一套滑杆语义；菜单栏只能用模板字形，粗细 + 透明度承担连接状态。
+        guard let image = statusIcon(connected: connected) else { return }
         statusItem.button?.image = image
-        statusItem.button?.toolTip = viewModel.isConnected
+        statusItem.button?.toolTip = connected
             ? L("WDeviceController · 已连接", "WDeviceController · Connected")
             : L("WDeviceController · 未连接", "WDeviceController · Disconnected")
+    }
+
+    /// 模板图只认 alpha，未连接时把透明度压进图里，系统着色深浅都不会把它提亮。
+    private func statusIcon(connected: Bool) -> NSImage? {
+        let configuration = NSImage.SymbolConfiguration(
+            pointSize: 15,
+            weight: connected ? .semibold : .regular
+        )
+        guard let symbol = NSImage(
+            systemSymbolName: "slider.horizontal.3",
+            accessibilityDescription: "WDeviceController"
+        )?.withSymbolConfiguration(configuration) else {
+            return nil
+        }
+
+        let size = NSSize(width: 18, height: 16)
+        symbol.size = size
+        if connected {
+            symbol.isTemplate = true
+            return symbol
+        }
+
+        let dimmed = NSImage(size: size)
+        dimmed.lockFocus()
+        symbol.draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .sourceOver, fraction: 0.45)
+        dimmed.unlockFocus()
+        dimmed.isTemplate = true
+        return dimmed
     }
 
     // MARK: - 显示/隐藏

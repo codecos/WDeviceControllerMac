@@ -24,20 +24,11 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_PATH" "$APP/Contents/MacOS/WDeviceControllerMac"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 
-# 图标：首次构建时生成 AppIcon.icns
-if [ ! -f "$ROOT/Resources/AppIcon.icns" ]; then
+# 图标：画法变了（脚本比 icns 新）就重新生成
+ICON_SRC="$ROOT/scripts/make-icon.swift"
+if [ ! -f "$ROOT/Resources/AppIcon.icns" ] || [ "$ICON_SRC" -nt "$ROOT/Resources/AppIcon.icns" ]; then
     echo "==> generate app icon"
-    TMP="$(mktemp -d)"
-    swift "$ROOT/scripts/make-icon.swift" "$TMP/icon-1024.png" >/dev/null
-    ICONSET="$TMP/AppIcon.iconset"
-    mkdir -p "$ICONSET"
-    for s in 16 32 128 256 512; do
-        sips -z $s $s "$TMP/icon-1024.png" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
-        d=$((s * 2))
-        sips -z $d $d "$TMP/icon-1024.png" --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
-    done
-    iconutil -c icns "$ICONSET" -o "$ROOT/Resources/AppIcon.icns"
-    rm -rf "$TMP"
+    swift "$ICON_SRC" --icns "$ROOT/Resources/AppIcon.icns" >/dev/null
 fi
 cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
