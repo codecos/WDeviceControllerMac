@@ -16,11 +16,13 @@ struct PlayerLinkSnapshot: Equatable {
     let coverURL: URL?
 }
 
-/// 通过局域网 HTTP 直连 No Glass Player 的 WebHost。
+/// 通过局域网直连 No Glass Player 的 WebHost。
 ///
-/// Windows 端的 PlayerLink 走的是命名管道上的 HTTP；macOS 没有对应管道，
-/// 这里改为直接访问 WebHost 的 HTTP 接口（与 NoGlassPlayerSwift 的做法一致）：
-/// 先用 `NGP_WEB_DISCOVER_V1` 广播发现节点，再轮询 `api/state` + `api/player/queue`。
+/// Windows 端没有 WebHost，走的是命名管道 HTTP：`/health` 握手后用 `/api/playback/watch`
+/// 做长轮询。macOS 这条链路的等价物是 WebHost 的 `WS /ws`（网页端用的就是它）：
+/// 连上后服务端主动推 `state`（放歌时每秒一条）与 `queueChanged`，没变化就完全不发包，
+/// 等同于 Windows 那条"没变化回 204"的长轮询，但省掉每次重挂的请求开销。
+/// 推送静默超过 4 秒（暂停/停止后服务端只在变化时发包，或休眠唤醒后连接假死）才用 `api/state` 兜底。
 @MainActor
 final class PlayerLinkService {
     var onConnectionChange: ((Bool, String?) -> Void)?
@@ -29,6 +31,7 @@ final class PlayerLinkService {
     private(set) var isConnected = false
     private(set) var nodeName: String?
 
+    /// REST 用（`api/state`、`api/player/queue`、控制指令）。
     private let session: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 6
@@ -38,12 +41,34 @@ final class PlayerLinkService {
         return URLSession(configuration: configuration)
     }()
 
+    /// 推送通道单独一套：`timeoutIntervalForResource` 限制的是整条连接的总时长，
+    /// 复用 REST 那套 10 秒会把 WebSocket 定期掐断，所以这里保留默认值。
+    private let streamSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 6
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }()
+
     private var loopTask: Task<Void, Never>?
     private var baseURL: URL?
     private var latestSnapshot: PlayerLinkSnapshot?
+    /// 当前推送连接：`stop()` 里要主动掐断，否则 `receive` 会一直挂在旧连接上。
+    private var activeSocket: URLSessionWebSocketTask?
 
-    private static let pollInterval: UInt64 = 1_000_000_000
+    // 推送驱动的当前值。队列只在换曲时拉，和原来的缓存策略一致。
+    private var currentState: PlaybackStateResponse?
+    private var currentQueue: QueueResponse?
+    private var queueIdentity: String?
+    private var lastEventAt = Date.distantPast
+    private var pushCount = 0
+
+    /// 推送静默多久走一次 REST 兜底：暂停/停止后服务端不再按秒推，必须靠它对齐。
+    private static let silentTimeout: TimeInterval = 4
+    private static let watchdogInterval: UInt64 = 1_000_000_000
     private static let discoveryInterval: TimeInterval = 5
+    /// 同一节点连续失败多少次才放弃、回到"重新发现"（对端 IP 可能已经变了）。
+    private static let maxStreamRetries = 3
 
     // MARK: - 生命周期
 
@@ -57,6 +82,9 @@ final class PlayerLinkService {
     func stop() {
         loopTask?.cancel()
         loopTask = nil
+        // URLSession 的 `receive` 不会因为 Task 取消而返回，必须显式掐掉连接。
+        activeSocket?.cancel(with: .goingAway, reason: nil)
+        activeSocket = nil
         markDisconnected()
     }
 
@@ -87,7 +115,7 @@ final class PlayerLinkService {
             var attached = false
             for node in nodes {
                 do {
-                    try await attachAndPoll(node)
+                    try await attachAndStream(node)
                     attached = true
                     backoff = 1
                     break
@@ -97,15 +125,16 @@ final class PlayerLinkService {
                 }
             }
 
+            // 已被 stop()/新的 rediscover 取代的这一轮不要再动状态，否则会把新连接的界面抹掉。
+            guard !Task.isCancelled else { break }
             if !attached { markDisconnected() }
 
-            guard !Task.isCancelled else { break }
             try? await Task.sleep(nanoseconds: UInt64(backoff * 1_000_000_000))
             backoff = min(backoff * 2, 8)
         }
     }
 
-    private func attachAndPoll(_ node: DiscoveredPlayerNode) async throws {
+    private func attachAndStream(_ node: DiscoveredPlayerNode) async throws {
         guard let base = URL(string: node.urlString), base.scheme != nil else {
             throw PlayerLinkError.badURL
         }
@@ -117,39 +146,198 @@ final class PlayerLinkService {
         guard health.authRequired != true else {
             throw PlayerLinkError.notReady(L("该节点需要鉴权", "This node requires authentication"))
         }
+        guard Self.webSocketURL(base) != nil else {
+            throw PlayerLinkError.badURL
+        }
+        // 握手期间已经被 stop() 取代：不要再覆盖新一轮连接的状态。
+        try Task.checkCancellation()
 
         baseURL = base
-        setConnected(true, name: health.nodeName ?? node.displayName)
+        nodeName = health.nodeName ?? node.displayName
+        currentState = nil
+        currentQueue = nil
+        queueIdentity = nil
+        lastEventAt = .distantPast
         latestSnapshot = nil
+
+        setConnected(true, name: nodeName)
         onSnapshot?(nil)
 
-        var queue: QueueResponse?
-        var queueKey: String?
+        // 先取一份 REST 快照：推送要等连接建立才有，界面不必空等这一拍。
+        try await refreshFromREST(base)
+
+        try await stream(base)
+    }
+
+    // MARK: - 推送通道
+
+    /// 维持一条 `/ws` 连接，把服务端的 `state` / `queueChanged` 落到快照上。
+    /// 断线先在同一个节点上重连几次，仍不成功才抛给上层重新发现。
+    private func stream(_ base: URL) async throws {
+        guard let url = Self.webSocketURL(base) else { throw PlayerLinkError.badURL }
+
+        var failures = 0
 
         while !Task.isCancelled {
-            let state: PlaybackStateResponse
+            let task = streamSession.webSocketTask(with: url)
+            task.resume()
+            activeSocket = task
+
+            let before = pushCount
+
+            // 静默兜底与接收循环并行：服务端暂停后不再按秒推，得有人去 REST 对齐。
+            let watchdog = Task { [weak self] in
+                await self?.watchSilence(base, task: task)
+            }
+
             do {
-                state = try await get(base, "api/state")
+                try await receiveLoop(task)
             } catch {
-                // 单次抖动先重试一次，仍失败才判定掉线，避免播放器瞬间忙时闪烁。
-                try await Task.sleep(nanoseconds: 400_000_000)
-                state = try await get(base, "api/state")
+                // 对端关闭、网络中断、取消都走这里，统一按断线处理。
             }
 
-            let identity = "\(state.playbackSessionId ?? 0)|\(state.albumId ?? -1)|\(state.filePath ?? "")"
-            if identity != queueKey {
-                queue = try? await get(base, "api/player/queue")
-                queueKey = identity
-            }
+            watchdog.cancel()
+            task.cancel(with: .goingAway, reason: nil)
+            if activeSocket === task { activeSocket = nil }
 
-            let snapshot = makeSnapshot(state: state, queue: queue, base: base)
-            if snapshot != latestSnapshot {
-                latestSnapshot = snapshot
-                onSnapshot?(snapshot)
-            }
+            guard !Task.isCancelled else { return }
 
-            try await Task.sleep(nanoseconds: Self.pollInterval)
+            // 断线前还在收推送，说明连接本身是好的（对端重启之类），失败计数从 0 重来。
+            if pushCount != before { failures = 0 }
+            failures += 1
+            guard failures <= Self.maxStreamRetries else { throw PlayerLinkError.disconnected }
+
+            try? await Task.sleep(nanoseconds: UInt64(1 << (failures - 1)) * 250_000_000)
         }
+    }
+
+    private func receiveLoop(_ task: URLSessionWebSocketTask) async throws {
+        while !Task.isCancelled {
+            let message: URLSessionWebSocketTask.Message
+            do {
+                message = try await task.receive()
+            } catch {
+                throw PlayerLinkError.disconnected
+            }
+
+            switch message {
+            case .string(let text): handlePush(Data(text.utf8))
+            case .data(let data): handlePush(data)
+            @unknown default: break
+            }
+        }
+    }
+
+    /// 解析一条推送。协议与网页端一致：`{type, ...}`，`state` / `queueChanged` 的载荷
+    /// 就是 REST 那两份 JSON 的同一份，所以解码结构可以直接复用。
+    private func handlePush(_ data: Data) {
+        struct TypeOnly: Decodable { let type: String? }
+        guard let header = try? JSONDecoder().decode(TypeOnly.self, from: data),
+              let type = header.type else { return }
+
+        lastEventAt = Date()
+        pushCount &+= 1
+
+        switch type {
+        case "state":
+            guard let push = try? JSONDecoder().decode(StatePush.self, from: data) else { return }
+            currentState = push.state
+            publish()
+            refreshQueueIfNeeded()
+
+        case "queueChanged":
+            guard let push = try? JSONDecoder().decode(QueuePush.self, from: data) else { return }
+            currentQueue = push.queue
+            queueIdentity = Self.identity(currentState)
+            publish()
+
+        case "queueDisconnected":
+            currentQueue = nil
+            queueIdentity = nil
+            publish()
+            refreshQueueIfNeeded()
+
+        case "hostExited", "hostLifecycle":
+            // 宿主退出/重启时位置与队列的权威值都作废：先按停止收起，再拉一次真实状态。
+            let push = try? JSONDecoder().decode(LifecyclePush.self, from: data)
+            if type == "hostExited" || push?.state == "down" {
+                currentState?.status = "stopped"
+                currentState?.positionMs = 0
+                publish()
+            }
+            if push?.state == "up", push?.restarted == true {
+                refreshFromRESTInBackground()
+            }
+
+        default:
+            break
+        }
+    }
+
+    /// 换曲才拉队列：位置每秒都在变，队列只在会话/专辑/曲目变化时才有意义。
+    private func refreshQueueIfNeeded() {
+        guard let base = baseURL else { return }
+        let identity = Self.identity(currentState)
+        guard identity != queueIdentity else { return }
+        Task { [weak self] in
+            await self?.loadQueue(base, identity: identity)
+        }
+    }
+
+    private func loadQueue(_ base: URL, identity: String) async {
+        guard let queue: QueueResponse = try? await get(base, "api/player/queue") else { return }
+        // 拉取期间已经换曲：这份队列过期了，丢掉等下一次。
+        guard Self.identity(currentState) == identity else { return }
+        currentQueue = queue
+        queueIdentity = identity
+        publish()
+    }
+
+    /// 推送静默的兜底：暂停/停止后服务端只在变化时发包，休眠唤醒后连接也可能假死。
+    /// 静默超过 4 秒用一次 `api/state` 对齐；REST 也取不到就掐断连接让接收循环去重连。
+    private func watchSilence(_ base: URL, task: URLSessionWebSocketTask) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: Self.watchdogInterval)
+            guard !Task.isCancelled else { return }
+            guard Date().timeIntervalSince(lastEventAt) >= Self.silentTimeout else { continue }
+
+            guard let state: PlaybackStateResponse = try? await get(base, "api/state") else {
+                task.cancel(with: .goingAway, reason: nil)
+                return
+            }
+
+            currentState = state
+            lastEventAt = Date()
+            publish()
+            refreshQueueIfNeeded()
+        }
+    }
+
+    /// 一次性 REST 快照（刚连上、宿主重启后）。
+    private func refreshFromREST(_ base: URL) async throws {
+        let state: PlaybackStateResponse = try await get(base, "api/state")
+        currentState = state
+        lastEventAt = Date()
+        if let queue: QueueResponse = try? await get(base, "api/player/queue") {
+            currentQueue = queue
+            queueIdentity = Self.identity(state)
+        }
+        publish()
+    }
+
+    private func refreshFromRESTInBackground() {
+        guard let base = baseURL else { return }
+        Task { [weak self] in
+            try? await self?.refreshFromREST(base)
+        }
+    }
+
+    private func publish() {
+        guard let state = currentState, let base = baseURL else { return }
+        let snapshot = makeSnapshot(state: state, queue: currentQueue, base: base)
+        guard snapshot != latestSnapshot else { return }
+        latestSnapshot = snapshot
+        onSnapshot?(snapshot)
     }
 
     private func makeSnapshot(state: PlaybackStateResponse, queue: QueueResponse?, base: URL) -> PlayerLinkSnapshot? {
@@ -258,11 +446,38 @@ final class PlayerLinkService {
 
     private func markDisconnected() {
         baseURL = nil
+        currentState = nil
+        currentQueue = nil
+        queueIdentity = nil
+        lastEventAt = .distantPast
         latestSnapshot = nil
         if isConnected || nodeName != nil {
             setConnected(false, name: nil)
         }
         onSnapshot?(nil)
+    }
+
+    /// 队列是否还有意义的判定键：换会话、换专辑、换曲都会变，位置变化不算。
+    private static func identity(_ state: PlaybackStateResponse?) -> String {
+        guard let state else { return "" }
+        return "\(state.playbackSessionId ?? 0)|\(state.albumId ?? -1)|\(state.filePath ?? "")"
+    }
+
+    /// 把 WebHost 的 `http(s)://host:port[/]` 换成 `ws(s)://host:port/ws`。
+    private static func webSocketURL(_ base: URL) -> URL? {
+        // 先按路径拼好再换协议：`URLComponents.path` 直接写相对形式会拼出非法 URL。
+        guard var components = URLComponents(
+            url: base.appendingPathComponent("ws"),
+            resolvingAgainstBaseURL: false
+        ) else { return nil }
+
+        switch components.scheme?.lowercased() {
+        case "https", "wss": components.scheme = "wss"
+        default: components.scheme = "ws"
+        }
+        components.query = nil
+        components.fragment = nil
+        return components.url
     }
 
     private static func nonEmpty(_ value: String?) -> String? {
@@ -300,9 +515,10 @@ private struct HealthResponse: Decodable {
 }
 
 private struct PlaybackStateResponse: Decodable {
-    let status: String?
+    // status / positionMs 会被 `hostExited` 推送就地改成停止态，其余字段只读。
+    var status: String?
+    var positionMs: Double?
     let filePath: String?
-    let positionMs: Double?
     let durationMs: Double?
     let playbackSessionId: Int64?
     let albumId: Int64?
@@ -323,12 +539,29 @@ private struct QueueResponse: Decodable {
     let canPrevious: Bool?
 }
 
+// MARK: - 推送载荷（`/ws` 的 `{type, ...}` 消息）
+
+private struct StatePush: Decodable {
+    let state: PlaybackStateResponse
+}
+
+private struct QueuePush: Decodable {
+    let queue: QueueResponse
+}
+
+private struct LifecyclePush: Decodable {
+    /// `hostLifecycle` 用 "up"/"down"；`hostExited` 没有这个字段，靠 type 区分。
+    let state: String?
+    let restarted: Bool?
+}
+
 private enum PlayerLinkError: LocalizedError {
     case badURL
     case badResponse
     case badPayload
     case http(Int)
     case notReady(String)
+    case disconnected
 
     var errorDescription: String? {
         switch self {
@@ -337,6 +570,7 @@ private enum PlayerLinkError: LocalizedError {
         case .badPayload: return L("播放器数据格式不兼容", "Unsupported player data format")
         case .http(let code): return LF("播放器返回 HTTP %ld", "Player returned HTTP %ld", code)
         case .notReady(let reason): return reason
+        case .disconnected: return L("播放器连接已断开", "Player connection lost")
         }
     }
 }

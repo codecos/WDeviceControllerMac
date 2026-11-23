@@ -465,7 +465,7 @@ final class MainViewModel: ObservableObject {
         let desired = !isPlaying
         isPlaying = desired
 
-        // 联动接管时命令发给播放器：它没有设备那种回显，靠 1s 轮询刷新真实状态。
+        // 联动接管时命令发给播放器：它没有设备那种回显，真实状态由 WebSocket 推送回来。
         if isPlayerLinkPrimary {
             playerLink.setPlaying(desired)
             return
