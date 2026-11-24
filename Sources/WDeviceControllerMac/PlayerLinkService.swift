@@ -258,7 +258,8 @@ final class PlayerLinkService {
             refreshQueueIfNeeded()
 
         case "hostExited", "hostLifecycle":
-            // 宿主退出/重启时位置与队列的权威值都作废：先按停止收起，再拉一次真实状态。
+            // 宿主退出/重启时位置与队列的权威值都作废：按停止收起（快照随之为 nil），
+            // 重启完成后再拉一次真实状态。
             let push = try? JSONDecoder().decode(LifecyclePush.self, from: data)
             if type == "hostExited" || push?.state == "down" {
                 currentState?.status = "stopped"
@@ -375,6 +376,11 @@ final class PlayerLinkService {
     }
 
     private func makeSnapshot(state: PlaybackStateResponse, queue: QueueResponse?, base: URL) -> PlayerLinkSnapshot? {
+        // 停止态不代表"还挂着一首歌"：宿主退出后 state 里的 filePath/duration 仍会留着
+        // （WebHost 若还在跑，`api/state` 兜底也会把这条残留再拉回来），
+        // 卡片就会停在上一首的 0:00 上，看起来像播放器根本没关。
+        guard (state.status ?? "").caseInsensitiveCompare("stopped") != .orderedSame else { return nil }
+
         let filePath = state.filePath ?? ""
         let currentItem = queue?.items?.first(where: { $0.isCurrent == true })
             ?? queue?.items?.first(where: { ($0.filePath ?? "") == filePath })
