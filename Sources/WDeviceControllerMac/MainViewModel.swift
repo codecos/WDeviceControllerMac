@@ -156,6 +156,16 @@ final class MainViewModel: ObservableObject {
                 self.applyAlbumArt(uri)
             }
         }
+
+        // Mac 睡眠会让 TCP 连接在没有任何事件的情况下失效，醒来后 URLSession 往往察觉不到。
+        // 醒后直接重建连接，避免“面板还在、所有操作都没反应”。
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.handleSystemWake() }
+        }
     }
 
     func start() {
@@ -301,15 +311,32 @@ final class MainViewModel: ObservableObject {
         await sendAsync(Outbound.requestPlayStatus())
         try? await Task.sleep(nanoseconds: 200_000_000)
         await sendAsync(Outbound.requestPlayStatus())
+
+        // 设置页可能是在断线状态下打开的：重连成功后补拉一次菜单，避免一直停在加载中。
+        if isMenuVisible {
+            await sendAsync(Outbound.requestMenuList())
+        }
     }
 
     func disconnect() {
         cancelReconnect()
         shouldAutoReconnect = false
+        isMenuVisible = false
         Task {
             await webSocket.disconnect()
             isConnected = false
             statusMessage = "已断开连接"
+        }
+    }
+
+    /// 每次展开面板都探一次活：长时间闲置后连接可能已经假死，发一条请求就能立刻发现并触发重连。
+    func panelDidShow() {
+        guard !isConnecting else { return }
+        if isConnected {
+            Task { await sendAsync(Outbound.requestPlayStatus()) }
+        } else if shouldAutoReconnect, let device = selectedDevice {
+            cancelReconnect()
+            Task { await connect(host: device.ip, port: device.port, name: device.hostname) }
         }
     }
 
@@ -339,7 +366,6 @@ final class MainViewModel: ObservableObject {
         availableSourceSet = []
         selectedSource = nil
         menuGroups = []
-        isMenuVisible = false
         bitrate = "--"
         isDeviceStandby = false
         volumeMin = 0
@@ -386,6 +412,14 @@ final class MainViewModel: ObservableObject {
     private func cancelReconnect() {
         reconnectTask?.cancel()
         reconnectTask = nil
+    }
+
+    /// 系统唤醒后不看当前状态，直接重建控制连接：休眠前那条 TCP 醒来时多半已经不可用了。
+    private func handleSystemWake() {
+        guard shouldAutoReconnect, let device = selectedDevice else { return }
+        cancelReconnect()
+        reconnectAttempt = 0
+        Task { await connect(host: device.ip, port: device.port, name: device.hostname) }
     }
 
     // MARK: - 音量
@@ -565,8 +599,16 @@ final class MainViewModel: ObservableObject {
 
     func openMenu() {
         isMenuVisible = true
-        // 每次打开都拉一次，设备可能在别处（旋钮/遥控器/手机）被改过。
-        Task { await sendAsync(Outbound.requestMenuList()) }
+        Task {
+            // 连接已掉线时先把连接恢复，connect() 成功后会自己补拉菜单。
+            if !isConnected, shouldAutoReconnect, let device = selectedDevice {
+                cancelReconnect()
+                await connect(host: device.ip, port: device.port, name: device.hostname)
+                return
+            }
+            // 每次打开都拉一次，设备可能在别处（旋钮/遥控器/手机）被改过。
+            await sendAsync(Outbound.requestMenuList())
+        }
     }
 
     func closeMenu() {

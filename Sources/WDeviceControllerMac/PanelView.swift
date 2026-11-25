@@ -404,11 +404,20 @@ private struct MenuSettingsView: View {
 
             if viewModel.menuGroups.isEmpty {
                 VStack(spacing: 10) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(L("正在读取设备设置…", "Loading device settings…"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    if viewModel.isConnected {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(L("正在读取设备设置…", "Loading device settings…"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.secondary)
+                        Text(L("连接已断开，正在重新连接…", "Connection lost, reconnecting…"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 60)

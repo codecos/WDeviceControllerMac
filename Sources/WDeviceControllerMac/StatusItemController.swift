@@ -219,6 +219,8 @@ final class StatusItemController: NSObject {
 
     func show() {
         refreshLayout()
+        // 闲置久了连接可能已经假死，展开面板时先探一次活。
+        viewModel.panelDidShow()
 
         guard let button = statusItem.button, let buttonWindow = button.window else { return }
         let anchorInWindow = button.convert(button.bounds, to: nil)

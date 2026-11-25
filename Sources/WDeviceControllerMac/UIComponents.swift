@@ -234,13 +234,27 @@ struct StatusPill: View {
 
 struct AlbumArtView: View {
     let image: NSImage?
+    var size: CGFloat = 168
 
     var body: some View {
         Group {
             if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
+                // 封面不一定是正方形（No Glass Player 的专辑图就是 16:9），
+                // 以前用 .fill 铺满方块会把两边裁掉，看起来像被“拉大裁剪”。
+                // 现在前景按原比例完整显示，空出来的部分用同一张图模糊铺底，既不变形也不丢内容。
+                ZStack {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size * 1.4, height: size * 1.4)
+                        .blur(radius: 24)
+                        .overlay(Color.black.opacity(0.18))
+
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: size, height: size)
+                }
             } else {
                 ZStack {
                     Rectangle().fill(Color.primary.opacity(0.06))
@@ -250,7 +264,7 @@ struct AlbumArtView: View {
                 }
             }
         }
-        .frame(width: 168, height: 168)
+        .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
