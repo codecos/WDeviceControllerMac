@@ -22,8 +22,8 @@ Waversa 官方网页 App 的 macOS 原生实现：菜单栏常驻，
 
 从 [Releases](https://github.com/codecos/WDeviceControllerMac/releases) 取最新包（Apple Silicon / macOS 13+）：
 
-- `WDeviceController-1.1.1-arm64.dmg`：挂载后把 App 拖到旁边的「应用程序」快捷方式
-- `WDeviceController-1.1.1-arm64.zip`：解压得到 App，自行拖进「应用程序」
+- `WDeviceController-1.1.2-arm64.dmg`：挂载后把 App 拖到旁边的「应用程序」快捷方式
+- `WDeviceController-1.1.2-arm64.zip`：解压得到 App，自行拖进「应用程序」
 
 应用为 ad-hoc 签名（无开发者证书），首次打开会被 Gatekeeper 拦下：
 在「应用程序」里右键 →「打开」，或执行 `xattr -dr com.apple.quarantine /Applications/WDeviceController.app`。
